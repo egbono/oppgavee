@@ -2,14 +2,20 @@
 <!--
   ============================================================
    OPPGAVER – Todo-app
-   Versjon:    2.65
+   Versjon:    2.66
    Oppdatert:  2026-05-26
   ============================================================
    Versjonshistorikk:
-     2.65 iPhone-fanen byttet rolle: iPhone X er nå default-
-          fanen (synlig), og iPhone ligger i rullgardinen
-          under. Klikk på fanen direkte går alltid til
-          iPhone X.
+     2.66 Eksport oppdatert:
+          - JSON-eksport inkluderer nå today_flag og
+            category-feltene (manglet fra v2.63)
+          - JSON-eksport inkluderer også slettede oppgaver
+            (state.deletedTasks) med deleted_at-tidsstempel
+          - CSV-eksport har nye kolonner: iphone_flag,
+            today_flag, category
+          - Import gjenkjenner og setter today_flag,
+            category og deleted_tasks korrekt
+     2.65 iPhone X som default-fane.
      2.64 Fiks: Smart plassering av gruppe-popup.
      2.63 "I dag"-flagg integrert i hele systemet.
      2.62 Lukk alle + Velg rammer i iPhone X.
@@ -115,8 +121,8 @@
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
 <meta name="application-name" content="Oppgaver" />
-<meta name="version" content="2.65" />
-<title>Oppgaver v2.65</title>
+<meta name="version" content="2.66" />
+<title>Oppgaver v2.66</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%23185FA5'/><g transform='translate(30 30)'><rect x='0' y='6' width='114' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><rect x='0' y='39' width='90' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><rect x='0' y='72' width='102' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><path d='M15 16.5 L21 22.5 L33 10.5' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><path d='M15 49.5 L21 55.5 L33 43.5' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='24' cy='82.5' r='9' fill='none' stroke='white' stroke-width='3.5'/></g></svg>" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%23185FA5'/><g transform='translate(30 30)'><rect x='0' y='6' width='114' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><rect x='0' y='39' width='90' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><rect x='0' y='72' width='102' height='21' rx='6' fill='rgba(255,255,255,0.25)'/><path d='M15 16.5 L21 22.5 L33 10.5' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><path d='M15 49.5 L21 55.5 L33 43.5' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='24' cy='82.5' r='9' fill='none' stroke='white' stroke-width='3.5'/></g></svg>" />
 <style>
@@ -807,7 +813,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 <script>
 (function(){
 const STORAGE_KEY = 'todoapp_v1';
-const APP_VERSION = '2.65';
+const APP_VERSION = '2.66';
 
 const ICONS = {
   check:'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 8"/></svg>',
@@ -4898,10 +4904,29 @@ function openExportModal(){
           completedAt:t.completed_at||t.completedAt||null,
           pinned: !!(t.pinned),
           iphoneFlag: !!(t.iphone_flag || t.iphoneFlag),
+          todayFlag: !!(t.today_flag || t.todayFlag),
+          category: ['none','urgent','a','b','c'].includes(t.category) ? t.category : 'none',
           order: typeof t.order === 'number' ? t.order : 0,
           number: typeof t.number === 'number' ? t.number : null,
           group1Id:t.group1_id||t.group1Id||t.group_id||t.groupId||null,
           group2Id:t.group2_id||t.group2Id||null
+        }));
+        if(Array.isArray(data.deleted_tasks)) state.deletedTasks = data.deleted_tasks.map(t=>({
+          id:t.id||uid('t'), title:t.title||'', notes:t.notes||'',
+          subtasks:t.subtasks||[], priority:t.priority||'med',
+          date:t.due_date||t.date||todayISO(),
+          futureDate:t.future_date||t.futureDate||null,
+          www:t.www||'', contact:t.contact||'',
+          images: Array.isArray(t.images) ? t.images : [],
+          pinned: !!(t.pinned),
+          iphoneFlag: !!(t.iphone_flag || t.iphoneFlag),
+          todayFlag: !!(t.today_flag || t.todayFlag),
+          category: ['none','urgent','a','b','c'].includes(t.category) ? t.category : 'none',
+          order: typeof t.order === 'number' ? t.order : 0,
+          number: typeof t.number === 'number' ? t.number : null,
+          group1Id: t.group1_id||t.group1Id||null,
+          group2Id: t.group2_id||t.group2Id||null,
+          deletedAt: t.deleted_at || t.deletedAt || new Date().toISOString()
         }));
         if(data.notes) state.notes = data.notes.map(n=>({
           id:n.id||uid('n'), title:n.title||'', description:n.description||'',
@@ -5105,11 +5130,27 @@ function exportJSON(){
       completed:t.done, completed_at:t.completedAt||null,
       pinned: !!t.pinned, order: t.order||0,
       iphone_flag: !!t.iphoneFlag,
+      today_flag: !!t.todayFlag,
+      category: t.category || 'none',
       number: typeof t.number === 'number' ? t.number : null,
       group1_id:t.group1Id||null, group1_name: getGroup1(t.group1Id)?.name || null,
       group2_id:t.group2Id||null, group2_name: getGroup2(t.group2Id)?.name || null
     })),
-    notes: state.notes.map(n=>({id:n.id, title:n.title, description:n.description||'', body:n.body||'', date:n.date, created_at:n.createdAt||null}))
+    notes: state.notes.map(n=>({id:n.id, title:n.title, description:n.description||'', body:n.body||'', date:n.date, created_at:n.createdAt||null})),
+    deleted_tasks: (state.deletedTasks||[]).map(t=>({
+      id:t.id, title:t.title, notes:t.notes||'',
+      subtasks: (t.subtasks||[]).map(s=>({id:s.id,text:s.text,done:s.done})),
+      priority:t.priority, due_date:t.date, future_date:t.futureDate||null,
+      www:t.www||'', contact:t.contact||'',
+      images:(t.images||[]),
+      pinned: !!t.pinned, order: t.order||0,
+      iphone_flag: !!t.iphoneFlag,
+      today_flag: !!t.todayFlag,
+      category: t.category || 'none',
+      number: typeof t.number === 'number' ? t.number : null,
+      group1_id:t.group1Id||null, group2_id:t.group2Id||null,
+      deleted_at: t.deletedAt||null
+    }))
   };
   download('backup_'+todayISO()+'.json', JSON.stringify(payload,null,2), 'application/json');
   showToast('Eksportert JSON');
@@ -5117,10 +5158,10 @@ function exportJSON(){
 
 function exportCSVTasks(){
   const esc = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  const rows = [['id','number','title','notes','subtasks','priority','due_date','future_date','www','contact','image_count','pinned','order','completed','completed_at','group1_id','group1_name','group2_id','group2_name']];
+  const rows = [['id','number','title','notes','subtasks','priority','due_date','future_date','www','contact','image_count','pinned','iphone_flag','today_flag','category','order','completed','completed_at','group1_id','group1_name','group2_id','group2_name']];
   state.tasks.forEach(t=>{
     const subs = (t.subtasks||[]).map(s=>(s.done?'[x] ':'[ ] ')+s.text).join(' | ');
-    rows.push([t.id,t.number||'',t.title,t.notes||'',subs,t.priority,t.date||'',t.futureDate||'',t.www||'',t.contact||'',(t.images||[]).length,t.pinned?'true':'false',t.order||0,t.done?'true':'false',t.completedAt||'',t.group1Id||'',getGroup1(t.group1Id)?.name||'',t.group2Id||'',getGroup2(t.group2Id)?.name||'']);
+    rows.push([t.id,t.number||'',t.title,t.notes||'',subs,t.priority,t.date||'',t.futureDate||'',t.www||'',t.contact||'',(t.images||[]).length,t.pinned?'true':'false',t.iphoneFlag?'true':'false',t.todayFlag?'true':'false',t.category||'none',t.order||0,t.done?'true':'false',t.completedAt||'',t.group1Id||'',getGroup1(t.group1Id)?.name||'',t.group2Id||'',getGroup2(t.group2Id)?.name||'']);
   });
   const csv = rows.map(r=>r.map(esc).join(',')).join('\n');
   download('oppgaver_'+todayISO()+'.csv', '\ufeff'+csv, 'text/csv;charset=utf-8');
